@@ -5,6 +5,7 @@ import { schema } from "@/db/schema"
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
 import { getActiveOrganization } from "@/server/organizations";
+import { ac, admin, developer, teamlead } from "./auth/permissions";
 
 export const auth = betterAuth({
     emailAndPassword:{
@@ -21,7 +22,14 @@ export const auth = betterAuth({
             clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
         }
     },
-    plugins: [organization(), nextCookies()],
+    plugins: [organization({
+      ac,
+      roles:{
+        developer,
+        admin,
+        teamlead
+      }
+    }), nextCookies()],
 
 
     databaseHooks: {

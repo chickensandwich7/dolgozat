@@ -8,11 +8,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { CreateOrganizationForm } from "@/components/forms/create-organization-form";
-
 import { Logout } from "@/components/ui/logout";
+import { getOrganizations } from "@/server/organizations";
+import  Link  from "next/link";
 
 
 export default async function DashboardPage() {
+  const organizations = await getOrganizations();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-10">
@@ -32,6 +34,16 @@ export default async function DashboardPage() {
           <CreateOrganizationForm />
         </DialogContent>
       </Dialog>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-2xl font-bold">Organiztaions</h2>
+        {organizations.map((organization) => (
+        <Button variant="outline" key={organization.id} asChild>
+          <Link href={`/dashboard/organization/${organization.slug}`}>
+            {organization.name}
+      </Link>
+    </Button>
+  ))}
+</div>
     </div>
   );
 }

@@ -39,3 +39,16 @@ export async function getActiveOrganization(userId: string) {
 
   return activeOrganization;
 }
+
+export async function getOrganizationBySlug(slug: string){
+  try{
+    const getOrganizationBySlug = await db.query.organization.findFirst({
+      where: eq(organization.slug, slug),
+    });
+    
+    return getOrganizationBySlug;
+  } catch(error){
+    console.error(error);
+    return null;
+  }
+}
