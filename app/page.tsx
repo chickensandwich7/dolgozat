@@ -1,11 +1,11 @@
-import { ModeSwitcher } from "@/components/ui/mode-switcher";
+//import { ModeSwitcher } from "@/components/ui/mode-switcher";
 import Image from "next/image";
 
 export default function Home() {
   return (
     <>
     <header className="absolute top-0 right-0 flex w-full items-center justify-between p-4">
-            <ModeSwitcher />
+            
         </header>
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">

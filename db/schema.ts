@@ -88,6 +88,11 @@ export const organization = pgTable(
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );
 
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(member),
+  invitations: many(invitation),
+}));
+
 export type Organization = typeof organization.$inferSelect;
 
 export const member = pgTable(
@@ -108,6 +113,12 @@ export const member = pgTable(
     index("member_userId_idx").on(table.userId),
   ],
 );
+
+export type Member = typeof member.$inferSelect & {
+  user: typeof user.$inferSelect;
+};
+
+export type User = typeof user.$inferSelect;
 
 export const invitation = pgTable(
   "invitation",
@@ -152,10 +163,7 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-export const organizationRelations = relations(organization, ({ many }) => ({
-  members: many(member),
-  invitations: many(invitation),
-}));
+
 
 export const memberRelations = relations(member, ({ one }) => ({
   organization: one(organization, {
@@ -179,4 +187,4 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
 }));
 
-export const schema = {user, session, account, verification, organization, member, invitation};
+export const schema = {user, session, account, verification, organization, member, invitation, organizationRelations, memberRelations};

@@ -35,7 +35,7 @@ export default async function DashboardPage() {
         </DialogContent>
       </Dialog>
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold">Organiztaions</h2>
+        <h2 className="text-2xl font-bold">Organizations</h2>
         {organizations.map((organization) => (
         <Button variant="outline" key={organization.id} asChild>
           <Link href={`/dashboard/organization/${organization.slug}`}>

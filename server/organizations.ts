@@ -44,6 +44,13 @@ export async function getOrganizationBySlug(slug: string){
   try{
     const getOrganizationBySlug = await db.query.organization.findFirst({
       where: eq(organization.slug, slug),
+      with: {
+        members: {
+          with:{
+            user: true, 
+          },
+        },
+      },
     });
     
     return getOrganizationBySlug;

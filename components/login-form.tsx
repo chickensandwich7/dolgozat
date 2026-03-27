@@ -14,7 +14,6 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -72,6 +71,12 @@ export function LoginForm({
       callbackURL: "/dashboard",
     });
   };
+  const loginWithGitlab = async () => {
+  await authClient.signIn.social({
+    provider: "gitlab",
+    callbackURL: "/dashboard", 
+  });
+};
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -93,7 +98,7 @@ export function LoginForm({
                     </svg>
                       Login with Github
                 </Button>
-                <Button variant="outline" type="button" className="w-full">
+                <Button variant="outline" type="button" className="w-full" onClick={loginWithGitlab}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="mr-2 h-4 w-4" style={{ color: '#FC6D26' }}>
       <           path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263c-.137-.423-.73-.423-.868 0L1.387 9.452.045 13.587c-.121.38.016.797.331 1.023l11.626 8.443 11.622-8.443c.315-.226.452-.643.331-1.023z"/>
                   </svg>
@@ -154,10 +159,7 @@ export function LoginForm({
           </Form>
         </CardContent>
       </Card>
-      <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
-      </FieldDescription>
+      
     </div>
   )
 }
