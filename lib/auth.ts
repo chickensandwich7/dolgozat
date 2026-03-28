@@ -5,7 +5,7 @@ import { schema } from "@/db/schema"
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
 import { getActiveOrganization } from "@/server/organizations";
-import { ac, admin, developer, teamlead } from "./auth/permissions";
+import { ac, admin, developer, teamlead, owner } from "./auth/permissions";
 
 export const auth = betterAuth({
     emailAndPassword:{
@@ -39,7 +39,8 @@ export const auth = betterAuth({
       roles:{
         developer,
         admin,
-        teamlead
+        teamlead,
+        owner
       }
     }), nextCookies()],
 

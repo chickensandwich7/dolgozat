@@ -2,8 +2,8 @@
 
 
 import { db } from "@/db/drizzle";
-import { eq, inArray } from "drizzle-orm";
-import { organization, member } from "@/db/schema";
+import { eq, inArray, and } from "drizzle-orm";
+import { organization, member, invitation } from "@/db/schema";
 import { getCurrentUser } from "./users";
 
 
@@ -59,3 +59,28 @@ export async function getOrganizationBySlug(slug: string){
     return null;
   }
 }
+
+export const getPendingInvitations = async (userEmail: string) => {
+  try {
+    const results = await db
+      .select({
+        id: invitation.id,
+        organizationId: invitation.organizationId,
+        organizationName: organization.name,
+        role: invitation.role,
+      })
+      .from(invitation)
+      .innerJoin(organization, eq(invitation.organizationId, organization.id))
+      .where(
+        and(
+          eq(invitation.email, userEmail),
+          eq(invitation.status, "pending")
+        )
+      );
+
+    return results;
+  } catch (error) {
+    console.error("Error fetching invitations:", error);
+    return [];
+  }
+};

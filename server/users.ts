@@ -3,7 +3,7 @@
 import { db } from "@/db/drizzle";
 import { member, user } from "@/db/schema";
 import { auth } from "@/lib/auth"
-import { eq, inArray, not } from "drizzle-orm";
+import { eq, inArray, not, or, ilike, and } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -81,19 +81,32 @@ export const signUp = async (email: string, password: string, username: string) 
 }
 }
 
-export const getUsers = async (organizationId: string) => {
+export const searchUsersToInvite = async (organizationId: string, searchQuery: string) => {
   try {
-    const members = await db.query.member.findMany({
+    if (!searchQuery || searchQuery.length < 2) {
+      return [];
+    }
+
+    const currentMembers = await db.query.member.findMany({
       where: eq(member.organizationId, organizationId),
     });
+    const memberIds = currentMembers.map((m) => m.userId);
+    const searchCondition = or(
+      ilike(user.name, `%${searchQuery}%`),
+      ilike(user.email, `%${searchQuery}%`)
+    );
 
     const users = await db.query.user.findMany({
-      where: not(inArray(user.id, members.map((member) => member.userId))),
+      where: memberIds.length > 0 
+        ? and(searchCondition, not(inArray(user.id, memberIds))) 
+        : searchCondition, 
+      limit: 5, 
     });
 
     return users;
+
   } catch (error) {
-    console.error(error);
+    console.error("Error seatching for users:", error);
     return [];
   }
-}
+};
