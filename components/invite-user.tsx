@@ -26,7 +26,7 @@ export function InviteUser({ activeOrganizationId }: { activeOrganizationId: str
     return () => clearTimeout(delayDebounceFn);
   }, [query, activeOrganizationId]);
 
-  const handleInvite = async (email: string) => {
+ const handleInvite = async (email: string) => {
     try {
       const { data, error } = await authClient.organization.inviteMember({
         email: email,
@@ -35,16 +35,25 @@ export function InviteUser({ activeOrganizationId }: { activeOrganizationId: str
       });
 
       if (error) {
-        console.error("Better Auth Hiba:", error);
-        alert(`Hiba a meghívás során: ${error.message || error.status}`);
+        console.error("Better Auth Error Details:", {
+          status: error.status,
+          statusText: error.statusText,
+          message: error.message,
+        });
+
+        if (error.status === 422 || error.status === 409) {
+          alert("This user has already been invited or is already a member of this organization.");
+        } else {
+          alert(`Failed to send invitation: ${error.message || "Unknown error"}`);
+        }
         return; 
       }
       
-      alert(`Invitation successfully sent to: ${email}`);
+      alert(`Invitation sent successfully to: ${email}`);
       setQuery("");
       setResults([]);
     } catch (err) {
-      console.error("Rendszerhiba:", err);
+      console.error("System Error:", err);
       alert("An unexpected error occurred!");
     }
   };

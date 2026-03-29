@@ -54,14 +54,13 @@ export default function MembersTable({ members }: { members: any[] }) {
     
     setLoadingId(memberId);
     try {
-      const { error } = await authClient.organization.removeMember({
-        memberIdOrEmail: memberId,
+      const { error } = await authClient.organization.leave({
         organizationId: orgId,
       });
 
       if (error) {
         console.error("Better Auth Error:", error);
-        alert(`Error: ${error.message || error.status}`);
+        alert(`Error: ${error.message || "Something went wrong"}`);
       } else {
         alert("You have successfully left the organization.");
         router.push("/dashboard"); 

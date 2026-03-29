@@ -17,54 +17,46 @@ export function PendingInvitations({ initialInvites }: { initialInvites: Invite[
   const router = useRouter();
 
   if (invites.length === 0) {
-    return null;
+    return (
+      <div className="py-10 text-center">
+        <p className="text-muted-foreground">No pending invitations.</p>
+      </div>
+    );
   }
 
-  const handleAccept = async (invitationId: string) => {
+  const handleAction = async (invitationId: string, action: 'accept' | 'reject') => {
     try {
-      await authClient.organization.acceptInvitation({ invitationId });
+      if (action === 'accept') {
+        await authClient.organization.acceptInvitation({ invitationId });
+      } else {
+        await authClient.organization.rejectInvitation({ invitationId });
+      }
+      
       setInvites((prev) => prev.filter((inv) => inv.id !== invitationId));
       router.refresh();
     } catch (error) {
-      console.error("Error accepting invite:", error);
-      alert("Failed to accept invitation.");
+      console.error(`Error ${action}ing invite:`, error);
+      alert(`Failed to ${action} invitation.`);
     }
-  };
-
-  const handleDecline = async (invitationId: string) => {
-    try {
-      await authClient.organization.rejectInvitation({ invitationId });
-      setInvites((prev) => prev.filter((inv) => inv.id !== invitationId));
-    } catch (error) {
-      console.error("Error declining invite:", error);
-      alert("Failed to decline invitation.");
-    }
-  };
-
-  const handleLater = (invitationId: string) => {
-    setInvites((prev) => prev.filter((inv) => inv.id !== invitationId));
   };
 
   return (
-    <div className="w-full space-y-4 mb-8">
+    <div className="w-full space-y-4 my-4">
       {invites.map((invite) => (
-        <div key={invite.id} className="bg-primary/10 border border-primary/20 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-lg">You have been invited!</h3>
-            <p className="text-sm text-muted-foreground">
-              You have a pending invitation to join <strong>{invite.organizationName}</strong> as a <em>{invite.role}</em>.
+        <div key={invite.id} className="bg-primary/5 border border-primary/10 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left">
+            <h3 className="font-semibold text-base">You have been invited!</h3>
+            <p className="text-xs text-muted-foreground">
+              To join <strong>{invite.organizationName}</strong> as a <em>{invite.role}</em>.
             </p>
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="default" onClick={() => handleAccept(invite.id)}>
+            <Button size="sm" variant="default" onClick={() => handleAction(invite.id, 'accept')}>
               Accept
             </Button>
-            <Button variant="destructive" onClick={() => handleDecline(invite.id)}>
+            <Button size="sm" variant="destructive" onClick={() => handleAction(invite.id, 'reject')}>
               Decline
-            </Button>
-            <Button variant="outline" onClick={() => handleLater(invite.id)}>
-              Later
             </Button>
           </div>
         </div>
