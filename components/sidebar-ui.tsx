@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Building2, Mail, Plus, LayoutDashboard, ChevronLeft, 
-  ChevronRight, CheckSquare, Users, Settings, ChevronDown, UserPlus 
+  ChevronRight, CheckSquare, Users, Settings, ChevronDown, UserPlus, GitCommit 
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Logout } from "@/components/ui/logout";
@@ -49,7 +49,6 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* FEJLÉC */}
       <div className="p-6 overflow-hidden shrink-0">
         <Link href="/dashboard" className="flex items-center gap-3 font-bold text-lg">
           <LayoutDashboard className="h-6 w-6 text-primary shrink-0" />
@@ -57,10 +56,8 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
         </Link>
       </div>
 
-      {/* FELSŐ RÉSZ: GÖRDÍTHETŐ TARTALOM (Menük és Alerts) */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-6">
         
-        {/* CSUPÁN EZT A KONTEXTUS-MENÜT HAGYJUK MEG ITT: */}
         {currentSlug && currentOrg ? (
           <div>
             {!isCollapsed && (
@@ -85,6 +82,13 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
                 {!isCollapsed && <span>Tasks</span>}
               </Link>
 
+              <Link
+  href={`/dashboard/organization/${currentSlug}/commits`}
+  className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", pathname.includes("/commits") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+>
+  <GitCommit className="h-4 w-4 shrink-0" />
+  {!isCollapsed && <span>Commits</span>}
+</Link>
               {isAdminOrOwner && (
                 <>
                   <Link
@@ -138,7 +142,6 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
            </div>
         )}
 
-        {/* ALERTS (Meghívók) maradnak középen */}
         {pendingInvites.length > 0 && (
           <div>
             {!isCollapsed && (
@@ -167,7 +170,6 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
         )}
       </div>
 
-      {/* ALSÓ RÉSZ: Legördülő Szervezetváltó (Itt listázzuk a szervezeteket) */}
       <div className="p-3 border-t bg-card mt-auto shrink-0 space-y-3 relative">
         
         {!isCollapsed ? (

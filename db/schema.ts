@@ -1,7 +1,6 @@
 import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 
-
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -88,13 +87,6 @@ export const organization = pgTable(
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );
 
-export const organizationRelations = relations(organization, ({ many }) => ({
-  members: many(member),
-  invitations: many(invitation),
-}));
-
-export type Organization = typeof organization.$inferSelect;
-
 export const member = pgTable(
   "member",
   {
@@ -113,12 +105,6 @@ export const member = pgTable(
     index("member_userId_idx").on(table.userId),
   ],
 );
-
-export type Member = typeof member.$inferSelect & {
-  user: typeof user.$inferSelect;
-};
-
-export type User = typeof user.$inferSelect;
 
 export const invitation = pgTable(
   "invitation",
@@ -142,11 +128,68 @@ export const invitation = pgTable(
   ],
 );
 
+export const project = pgTable(
+  "project",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(), 
+    githubRepo: text("github_repo").notNull(), 
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("project_organizationId_idx").on(table.organizationId)],
+);
+
+export const task = pgTable(
+  "task",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    description: text("description"), 
+    status: text("status").default("todo").notNull(), 
+    priority: text("priority").default("medium").notNull(), 
+    dueDate: timestamp("due_date"),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    assigneeId: text("assignee_id")
+      .references(() => user.id, { onDelete: "set null" }), 
+    createdById: text("created_by_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }), 
+    githubCommitLink: text("github_commit_link"), 
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("task_organizationId_idx").on(table.organizationId),
+    index("task_assigneeId_idx").on(table.assigneeId),
+  ],
+);
+
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(member),
+  invitations: many(invitation),
+  projects: many(project), 
+  tasks: many(task), 
+}));
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   members: many(member),
   invitations: many(invitation),
+  tasks: many(task), 
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -162,8 +205,6 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
-
-
 
 export const memberRelations = relations(member, ({ one }) => ({
   organization: one(organization, {
@@ -187,4 +228,37 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
 }));
 
-export const schema = {user, session, account, verification, organization, member, invitation, organizationRelations, memberRelations};
+export const projectRelations = relations(project, ({ one }) => ({
+  organization: one(organization, {
+    fields: [project.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+
+export const taskRelations = relations(task, ({ one }) => ({
+  organization: one(organization, {
+    fields: [task.organizationId],
+    references: [organization.id],
+  }),
+  assignee: one(user, {
+    fields: [task.assigneeId],
+    references: [user.id],
+  }),
+  creator: one(user, {
+    fields: [task.createdById],
+    references: [user.id],
+  }),
+}));
+
+
+export type Organization = typeof organization.$inferSelect;
+export type Member = typeof member.$inferSelect & { user: typeof user.$inferSelect; };
+export type User = typeof user.$inferSelect;
+export type Project = typeof project.$inferSelect;
+export type Task = typeof task.$inferSelect; // Ez is új
+
+export const schema = {
+  user, session, account, verification, organization, member, invitation, project, task, 
+  organizationRelations, memberRelations, userRelations, sessionRelations, accountRelations, invitationRelations, projectRelations, taskRelations 
+};
