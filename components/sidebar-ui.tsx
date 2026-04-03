@@ -4,14 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  Building2, Mail, Plus, LayoutDashboard, ChevronLeft, 
+  Building2, Bell, Plus, LayoutDashboard, ChevronLeft, 
   ChevronRight, CheckSquare, Users, Settings, ChevronDown, UserPlus, GitCommit 
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Logout } from "@/components/ui/logout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CreateOrganizationForm } from "@/components/forms/create-organization-form";
-import { PendingInvitations } from "@/components/pending-invitations";
 import { InviteUser } from "@/components/invite-user";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +19,10 @@ interface SidebarProps {
   pendingInvites: any[];
   user: any;
   initials: string;
+  unreadCount?: number; 
 }
 
-export function SidebarUI({ organizations, pendingInvites, user, initials }: SidebarProps) {
+export function SidebarUI({ organizations, pendingInvites, user, initials, unreadCount = 0 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
   
@@ -56,7 +56,7 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-6">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-6 scrollbar-thin">
         
         {currentSlug && currentOrg ? (
           <div>
@@ -83,12 +83,12 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
               </Link>
 
               <Link
-  href={`/dashboard/organization/${currentSlug}/commits`}
-  className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", pathname.includes("/commits") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
->
-  <GitCommit className="h-4 w-4 shrink-0" />
-  {!isCollapsed && <span>Commits</span>}
-</Link>
+                href={`/dashboard/organization/${currentSlug}/commits`}
+                className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", pathname.includes("/commits") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+              >
+                <GitCommit className="h-4 w-4 shrink-0" />
+                {!isCollapsed && <span>Commits</span>}
+              </Link>
               {isAdminOrOwner && (
                 <>
                   <Link
@@ -142,32 +142,26 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
            </div>
         )}
 
-        {pendingInvites.length > 0 && (
-          <div>
-            {!isCollapsed && (
-               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-4 px-3 mt-6">
-                 Alerts
-               </p>
+        <div>
+          {!isCollapsed && (
+             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-4 px-3 mt-6">
+               Notifications
+             </p>
+          )}
+          <Link
+            href="/dashboard/alerts"
+            className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", pathname === "/dashboard/alerts" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+          >
+            <Bell className="h-4 w-4 shrink-0" />
+            {!isCollapsed && <span className="flex-1 text-left">Alerts</span>}
+            
+            {unreadCount > 0 && (
+              <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
-            <Dialog>
-              <DialogTrigger asChild>
-                <button className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
-                  <Mail className="h-4 w-4 shrink-0" />
-                  {!isCollapsed && <span className="flex-1 text-left">Invites</span>}
-                  <span className="bg-destructive text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                    {pendingInvites.length}
-                  </span>
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Pending Invitations</DialogTitle>
-                </DialogHeader>
-                <PendingInvitations initialInvites={pendingInvites} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
+          </Link>
+        </div>
       </div>
 
       <div className="p-3 border-t bg-card mt-auto shrink-0 space-y-3 relative">
@@ -243,7 +237,6 @@ export function SidebarUI({ organizations, pendingInvites, user, initials }: Sid
            </button>
         )}
 
-        {/* User Info */}
         <div className="flex items-center gap-3 px-2 pt-2 border-t overflow-hidden">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={user.image || ""} />

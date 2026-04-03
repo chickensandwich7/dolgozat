@@ -2,14 +2,14 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, GripVertical, Github, Loader2, Filter, Edit2, Trash2, Calendar } from "lucide-react";
+import { Plus, GripVertical, Github, Loader2, Filter, Edit2, Trash2, Calendar, GitCommit, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug }: any) {
+export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug, githubRepo }: any) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +31,10 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
 
   const [commitPromptTask, setCommitPromptTask] = useState<any>(null);
   const [commitLink, setCommitLink] = useState("");
+  
+  const [commits, setCommits] = useState<any[]>([]);
+  const [isLoadingCommits, setIsLoadingCommits] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
 
   const columns = [
     { id: "todo", title: "To Do", color: "border-muted-foreground/20", bg: "bg-muted/10" },
@@ -42,6 +46,41 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
     high: "bg-red-500/10 text-red-500 border-red-500/20",
     medium: "bg-amber-500/10 text-amber-500 border-amber-500/20",
     low: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  };
+
+  
+  const getDueDateStatus = (dueDate: string | Date | null, status: string) => {
+    if (!dueDate || status === "done") return "text-muted-foreground";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const date = new Date(dueDate);
+    date.setHours(0, 0, 0, 0);
+
+    const diffTime = date.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return "text-red-500 font-bold bg-red-500/10 px-2 py-0.5 rounded"; 
+    if (diffDays === 0) return "text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded"; 
+    if (diffDays <= 2) return "text-yellow-500 font-medium"; 
+
+    return "text-muted-foreground"; 
+  };
+
+  const fetchRecentCommits = async () => {
+    if (!githubRepo) return; 
+    setIsLoadingCommits(true);
+    try {
+      const res = await fetch(`https://api.github.com/repos/${githubRepo}/commits?per_page=10`);
+      if (res.ok) {
+        const data = await res.json();
+        setCommits(data);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingCommits(false);
+    }
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -135,11 +174,19 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
     e.preventDefault();
     const taskId = e.dataTransfer.getData("taskId");
     const draggedTask = tasks.find((t: any) => t.id === taskId);
+    
     if (!draggedTask || draggedTask.status === newStatus) return;
+    
     if (newStatus === "done" && !draggedTask.githubCommitLink) {
       setCommitPromptTask(draggedTask);
+      setShowManualInput(!githubRepo); 
+      setCommitLink("");
+      if (githubRepo) {
+        fetchRecentCommits();
+      }
       return; 
     }
+    
     updateTaskStatus(taskId, newStatus);
   };
 
@@ -239,6 +286,8 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
                 const assignedMember = members.find((m: any) => m.userId === task.assigneeId);
                 const isDraggable = isAdmin || task.assigneeId === currentUser.id;
 
+                const dateStyleClass = getDueDateStatus(task.dueDate, task.status);
+
                 return (
                   <div key={task.id} draggable={isDraggable} onDragStart={(e) => handleDragStart(e, task.id)} className={`bg-card p-4 rounded-xl border border-border/50 shadow-sm transition-all duration-200 group flex flex-col ${isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-primary/50' : 'opacity-75'}`}>
                     <div className="flex justify-between items-start mb-2 gap-2">
@@ -261,9 +310,11 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
                     )}
 
                     {task.dueDate && (
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] mb-3">
+                      <div className={`flex items-center gap-1.5 text-[10px] mb-3 transition-colors w-fit ${dateStyleClass}`}>
                         <Calendar className="h-3 w-3" />
                         {new Date(task.dueDate).toLocaleDateString()}
+                        {dateStyleClass.includes("red-500") && " (Overdue)"}
+                        {dateStyleClass.includes("amber-500") && " (Today)"}
                       </div>
                     )}
 
@@ -326,12 +377,70 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug 
       </Dialog>
 
       <Dialog open={!!commitPromptTask} onOpenChange={(open) => !open && setCommitPromptTask(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Almost there! 🚀</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">To move <strong>{commitPromptTask?.title}</strong> to Done, please provide the GitHub commit link as proof of work.</p>
-            <Input placeholder="https://github.com/..." value={commitLink} onChange={(e) => setCommitLink(e.target.value)} />
-            <Button onClick={handleCommitSubmit} disabled={isLoading || !commitLink} className="w-full">Submit & Finish Task</Button>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Github className="h-5 w-5"/> Select a Commit</DialogTitle></DialogHeader>
+          
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground mb-4">Link your work to finish <strong>{commitPromptTask?.title}</strong>.</p>
+            
+            {!showManualInput && githubRepo ? (
+              <div className="space-y-3">
+                {isLoadingCommits ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
+                    {commits.map((commit: any) => {
+                      const isSelected = commitLink === commit.html_url;
+                      const commitTitle = commit.commit.message.split('\n')[0]; 
+                      
+                      return (
+                        <div 
+                          key={commit.sha}
+                          onClick={() => setCommitLink(commit.html_url)}
+                          className={`p-3 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-3 w-full overflow-hidden ${isSelected ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-accent/50'}`}
+                        >
+                          <div className={`mt-0.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {isSelected ? <Check className="h-4 w-4" /> : <GitCommit className="h-4 w-4" />}
+                          </div>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="text-sm font-medium truncate block w-full" title={commitTitle}>{commitTitle}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-muted-foreground truncate max-w-[120px]">{commit.commit.author.name}</span>
+                              <span className="text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border font-mono shrink-0">
+                                {commit.sha.substring(0, 7)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="flex justify-center pt-2">
+                  <Button variant="link" size="sm" className="text-xs text-muted-foreground" onClick={() => setShowManualInput(true)}>
+                    Can't find it? Enter link manually
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-2">
+                  <Label>GitHub Commit URL</Label>
+                  <Input placeholder="https://github.com/..." value={commitLink} onChange={(e) => setCommitLink(e.target.value)} />
+                </div>
+                {githubRepo && (
+                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setShowManualInput(false); setCommitLink(""); }}>
+                    ← Back to recent commits
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            <div className="mt-6">
+              <Button onClick={handleCommitSubmit} disabled={isLoading || !commitLink} className="w-full">
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Link Commit & Finish Task"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

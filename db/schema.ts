@@ -251,6 +251,17 @@ export const taskRelations = relations(task, ({ one }) => ({
   }),
 }));
 
+export const notification = pgTable("notification", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id").references(() => organization.id, { onDelete: "cascade" }), 
+  type: text("type").notNull(), 
+  title: text("title").notNull(), 
+  message: text("message"), 
+  isRead: boolean("is_read").default(false).notNull(), 
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  actionLink: text("action_link"), 
+});
 
 export type Organization = typeof organization.$inferSelect;
 export type Member = typeof member.$inferSelect & { user: typeof user.$inferSelect; };

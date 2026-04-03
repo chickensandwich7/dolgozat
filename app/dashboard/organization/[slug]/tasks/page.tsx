@@ -1,11 +1,11 @@
 import { getOrganizationBySlug } from "@/server/organizations";
 import { db } from "@/db/drizzle";
-import { task } from "@/db/schema";
+import { task, project } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { KanbanBoard } from "@/components/kanban-board"; 
+import { KanbanBoard } from "@/components/kanban-board";
 
 export default async function TasksPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -22,11 +22,12 @@ export default async function TasksPage({ params }: { params: Promise<{ slug: st
 
   if (!currentUserMember) redirect(`/dashboard`);
 
-
   const isAdminOrOwner = currentUserMember.role === "owner" || currentUserMember.role === "admin";
 
-
   const initialTasks = await db.select().from(task).where(eq(task.organizationId, organization.id));
+
+  const projectData = await db.select().from(project).where(eq(project.organizationId, organization.id));
+  const githubRepo = projectData.length > 0 ? projectData[0].githubRepo : null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-theme(spacing.16))]">
@@ -44,6 +45,7 @@ export default async function TasksPage({ params }: { params: Promise<{ slug: st
            currentUser={session.user}
            isAdmin={isAdminOrOwner}
            slug={slug}
+           githubRepo={githubRepo} 
          />
       </div>
     </div>

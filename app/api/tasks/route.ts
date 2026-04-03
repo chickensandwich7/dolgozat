@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db/drizzle";
-import { task } from "@/db/schema";
+import { task, notification } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { getOrganizationBySlug } from "@/server/organizations";
@@ -52,6 +52,18 @@ export async function POST(req: Request) {
       createdById: session.user.id,
     }).returning();
 
+    if (assigneeId && assigneeId !== session.user.id) {
+      await db.insert(notification).values({
+        id: crypto.randomUUID(),
+        userId: assigneeId,
+        organizationId: organization.id,
+        type: "task_assigned",
+        title: "New Task Assigned",
+        message: `You have been assigned a new task: "${title}"`,
+        actionLink: `/dashboard/organization/${slug}/tasks`,
+      });
+    }
+
     return NextResponse.json(newTask[0]);
   } catch (error) {
     return new NextResponse("Internal Error", { status: 500 });
@@ -98,6 +110,24 @@ export async function PATCH(req: Request) {
       })
       .where(eq(task.id, taskId))
       .returning();
+
+    if (status === "done" && currentTask.status !== "done") {
+      const admins = organization.members.filter((m: any) => m.role === "admin" || m.role === "owner");
+      
+      for (const admin of admins) {
+        if (admin.userId !== session.user.id) {
+          await db.insert(notification).values({
+            id: crypto.randomUUID(),
+            userId: admin.userId,
+            organizationId: organization.id,
+            type: "task_completed",
+            title: "Task Completed",
+            message: `Task "${currentTask.title}" has been moved to Done by ${session.user.name || "a team member"}.`,
+            actionLink: `/dashboard/organization/${slug}/tasks`,
+          });
+        }
+      }
+    }
 
     return NextResponse.json(updatedTask[0]);
   } catch (error) {
