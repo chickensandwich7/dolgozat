@@ -73,7 +73,6 @@ export default async function OrganizationDashboardPage({ params }: { params: Pr
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* GYORS ELÉRÉS */}
         <div className="bg-card p-8 rounded-3xl border shadow-sm flex flex-col justify-between">
           <div className="space-y-4">
             <h2 className="text-xl font-bold">Ready to work?</h2>
