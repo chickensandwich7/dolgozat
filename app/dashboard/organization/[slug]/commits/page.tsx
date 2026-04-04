@@ -2,17 +2,29 @@ import { getOrganizationBySlug } from "@/server/organizations";
 import { db } from "@/db/drizzle";
 import { project } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { GitCommit, ExternalLink } from "lucide-react";
+import { GitCommit, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers"; 
+import { Button } from "@/components/ui/button";
 
-export default async function CommitsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CommitsPage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { slug } = await params;
+  
+ 
+  const resolvedSearchParams = await searchParams;
+  const currentPage = Number(resolvedSearchParams.page) || 1;
+  const perPage = 10; 
+
   const organization = await getOrganizationBySlug(slug);
 
   if (!organization) return <div>Organization not found</div>;
-
 
   const session = await auth.api.getSession({ headers: await headers() });
   const currentMember = organization.members.find(
@@ -20,11 +32,8 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
   );
   const isAdminOrOwner = currentMember?.role === "owner" || currentMember?.role === "admin";
 
-
   const linkedProjects = await db.select().from(project).where(eq(project.organizationId, organization.id));
   const activeProject = linkedProjects[0];
-
-
   if (!activeProject) {
     return (
       <div className="max-w-4xl mx-auto py-10">
@@ -33,7 +42,6 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
             <GitCommit className="h-10 w-10 text-muted-foreground mb-4 opacity-50" />
             <h2 className="text-lg font-semibold mb-2">No repository linked</h2>
             
-
             {isAdminOrOwner ? (
               <>
                 <p className="text-muted-foreground mb-6 max-w-sm">
@@ -51,7 +59,6 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
                 An administrator needs to link a GitHub repository in the settings before you can view the commit history.
               </p>
             )}
-
          </div>
       </div>
     );
@@ -59,7 +66,7 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
 
   let commits = [];
   try {
-    const res = await fetch(`https://api.github.com/repos/${activeProject.githubRepo}/commits`, {
+    const res = await fetch(`https://api.github.com/repos/${activeProject.githubRepo}/commits?per_page=${perPage}&page=${currentPage}`, {
       next: { revalidate: 60 } 
     });
     
@@ -70,24 +77,26 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
     console.error("Failed to fetch commits from GitHub", error);
   }
 
+  const hasNextPage = commits.length === perPage;
+
   return (
-    <div className="max-w-4xl mx-auto py-10">
+    <div className="max-w-4xl mx-auto py-10 flex flex-col min-h-[calc(100vh-100px)]">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Project Commits</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Showing the latest commits from <span className="font-semibold text-foreground">{activeProject.githubRepo}</span>
+            Showing commits from <span className="font-semibold text-foreground">{activeProject.githubRepo}</span> (Page {currentPage})
           </p>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1">
         {commits.length === 0 ? (
            <p className="text-muted-foreground text-center py-10 bg-card border rounded-xl">
-             No commits found, or GitHub API limit reached. Try again later!
+             No commits found on this page, or GitHub API limit reached. Try again later!
            </p>
         ) : (
-          commits.slice(0, 30).map((commitItem: any) => (
+          commits.map((commitItem: any) => (
             <div key={commitItem.sha} className="bg-card border rounded-xl p-4 flex gap-4 items-start hover:border-primary/50 transition-colors group">
               <div className="bg-primary/10 p-2 rounded-full shrink-0 mt-1">
                 <GitCommit className="h-5 w-5 text-primary" />
@@ -115,6 +124,45 @@ export default async function CommitsPage({ params }: { params: Promise<{ slug: 
           ))
         )}
       </div>
+
+      <div className="flex items-center justify-between mt-8 pt-4 border-t">
+        <Button 
+          variant="outline" 
+          disabled={currentPage === 1}
+          asChild={currentPage > 1}
+        >
+          {currentPage > 1 ? (
+            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage - 1}`}>
+              <ChevronLeft className="h-4 w-4 mr-2" /> Previous
+            </Link>
+          ) : (
+            <>
+              <ChevronLeft className="h-4 w-4 mr-2" /> Previous
+            </>
+          )}
+        </Button>
+        
+        <div className="text-sm font-medium text-muted-foreground bg-muted px-4 py-1.5 rounded-full">
+          Page {currentPage}
+        </div>
+
+        <Button 
+          variant="outline" 
+          disabled={!hasNextPage}
+          asChild={hasNextPage}
+        >
+          {hasNextPage ? (
+            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage + 1}`}>
+              Next <ChevronRight className="h-4 w-4 ml-2" />
+            </Link>
+          ) : (
+            <>
+              Next <ChevronRight className="h-4 w-4 ml-2" />
+            </>
+          )}
+        </Button>
+      </div>
+
     </div>
   );
 }

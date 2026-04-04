@@ -237,18 +237,47 @@ export function SidebarUI({ organizations, pendingInvites, user, initials, unrea
            </button>
         )}
 
-        <div className="flex items-center gap-3 px-2 pt-2 border-t overflow-hidden">
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarImage src={user.image || ""} />
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-          {!isCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium truncate">{user.name}</span>
+        <div className="flex items-center justify-between pt-2 mt-2 border-t overflow-hidden">
+          {!isCollapsed ? (
+            <>
+              <Link 
+                href="/dashboard/settings" 
+                className="flex items-center gap-3 group flex-1 min-w-0 hover:bg-accent p-2 -ml-2 rounded-lg transition-colors cursor-pointer"
+                title="Account Settings"
+              >
+                <Avatar className="h-9 w-9 border border-border shadow-sm shrink-0">
+                  <AvatarImage src={user.image || ""} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                    {user.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Settings className="h-3 w-3" /> Account Settings
+                  </span>
+                </div>
+              </Link>
+
+              <div className="shrink-0 ml-1">
+                <Logout />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 w-full pb-2 mt-2">
+              <Link href="/dashboard/settings" title="Account Settings" className="hover:opacity-80 transition-opacity">
+                <Avatar className="h-8 w-8 shrink-0 border border-border shadow-sm">
+                  <AvatarImage src={user.image || ""} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+              </Link>
               <Logout />
             </div>
           )}
         </div>
+
       </div>
     </aside>
   );

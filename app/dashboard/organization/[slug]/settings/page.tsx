@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Github } from "lucide-react";
 import { RepoSettingsForm } from "@/components/repo-settings-form";
+import { DeleteOrganizationZone } from "@/components/ui/delete-organization-zone"; 
 import { db } from "@/db/drizzle";
 import { project } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -36,7 +37,7 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
         </p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6">
+      <div className="bg-card border rounded-xl p-6 mb-8">
         <div className="flex items-center gap-3 mb-6">
           <Github className="h-6 w-6" />
           <div>
@@ -49,6 +50,11 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
 
         <RepoSettingsForm slug={slug} initialProject={currentProject} />
       </div>
+
+      {role === "owner" && (
+        <DeleteOrganizationZone slug={slug} />
+      )}
+
     </div>
   );
 }
