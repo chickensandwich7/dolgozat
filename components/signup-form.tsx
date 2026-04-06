@@ -149,12 +149,7 @@ export function SignupForm({
                           </FormItem>
                         )}
                       />
-                  <a
-                    href="#"
-                    className="ml-auto text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
+                  
                 </div>
                 
               </Field>

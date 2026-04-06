@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug, githubRepo }: any) {
   const router = useRouter();
@@ -325,10 +325,12 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
                         </a>
                       ) : <div />}
                       <Avatar className="h-6 w-6 border border-border">
+
+                        <AvatarImage src={assignedMember?.user?.image || ""} />
                         <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-medium">
-                          {assignedMember ? assignedMember.user.name.substring(0, 2).toUpperCase() : "?"}
-                        </AvatarFallback>
-                      </Avatar>
+                        {assignedMember ? assignedMember.user.name.substring(0, 2).toUpperCase() : "?"}
+                     </AvatarFallback>
+                        </Avatar>
                     </div>
                   </div>
                 );
