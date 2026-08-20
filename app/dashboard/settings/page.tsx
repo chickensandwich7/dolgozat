@@ -16,7 +16,9 @@ export default async function GlobalSettingsPage() {
     where: eq(account.userId, session.user.id)
   });
   
+  // Lekérdezzük mindkét szolgáltatót
   const hasGithub = userAccounts.some((acc) => acc.providerId === "github");
+  const hasGitlab = userAccounts.some((acc) => acc.providerId === "gitlab");
 
   return (
     <div className="max-w-2xl mx-auto p-8 space-y-8">
@@ -25,7 +27,11 @@ export default async function GlobalSettingsPage() {
         <p className="text-muted-foreground mt-1">Manage your personal profile.</p>
       </div>
 
-      <SettingsForm user={session.user} initialHasGithubLinked={hasGithub} />
+      <SettingsForm 
+        user={session.user} 
+        initialHasGithubLinked={hasGithub} 
+        initialHasGitlabLinked={hasGitlab} 
+      />
     </div>
   );
 }

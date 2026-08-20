@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Github, Gitlab } from "lucide-react";
 
 export function RepoSettingsForm({ slug, initialProject }: { slug: string, initialProject: any }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState("");
-  const [githubRepo, setGithubRepo] = useState("");
+  const [repoPath, setRepoPath] = useState("");
+  const [provider, setProvider] = useState<"github" | "gitlab">("github");
   const [showWarning, setShowWarning] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -22,45 +23,60 @@ export function RepoSettingsForm({ slug, initialProject }: { slug: string, initi
       return;
     }
 
-    if (initialProject && !window.confirm("Biztosan felülírod a jelenlegi repót? Ez a művelet nem vonható vissza!")) {
+    if (initialProject && !window.confirm("Are you sure you want to replace the current repository? This action cannot be undone!")) {
       setShowWarning(false); 
       return;
     }
 
     setIsLoading(true);
 
+    const combinedRepoData = `${provider}|${repoPath}`;
+
     try {
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, githubRepo, slug }),
+        body: JSON.stringify({ name, githubRepo: combinedRepoData, slug }),
       });
 
       if (!response.ok) throw new Error("Failed");
 
       alert(initialProject ? "Repository replaced successfully!" : "Repository linked successfully!");
       setName("");
-      setGithubRepo("");
+      setRepoPath("");
       setShowWarning(false);
       router.refresh(); 
     } catch (error) {
-      alert("Something went wrong.");
+      alert("Something went wrong during saving.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const displayLinkedRepo = () => {
+    if (!initialProject || !initialProject.githubRepo) return null;
+    const parts = initialProject.githubRepo.split("|");
+    const linkedProvider = parts.length > 1 ? parts[0] : "github";
+    const linkedPath = parts.length > 1 ? parts[1] : initialProject.githubRepo;
+
+    return (
+      <div className="p-4 bg-accent/50 border rounded-lg flex items-center justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Currently Linked Repository</p>
+          <div className="flex items-center gap-2 font-semibold">
+            {linkedProvider === "gitlab" ? <Gitlab className="w-4 h-4 text-orange-500" /> : <Github className="w-4 h-4" />}
+            {initialProject.name} 
+            <span className="text-muted-foreground font-normal ml-1">({linkedPath})</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       
-      {initialProject && (
-        <div className="p-4 bg-accent/50 border rounded-lg flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Currently Linked Repository</p>
-            <p className="font-semibold">{initialProject.name} <span className="text-muted-foreground font-normal ml-1">({initialProject.githubRepo})</span></p>
-          </div>
-        </div>
-      )}
+      {displayLinkedRepo()}
 
       <form onSubmit={onSubmit} className="space-y-4 max-w-md">
         <div className="space-y-2">
@@ -76,15 +92,48 @@ export function RepoSettingsForm({ slug, initialProject }: { slug: string, initi
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="githubRepo">{initialProject ? "New GitHub Repository" : "GitHub Repository"}</Label>
+          <Label>Provider</Label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setProvider("github")}
+              disabled={isLoading}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-md transition-all ${
+                provider === "github" 
+                  ? "bg-primary text-primary-foreground border-primary" 
+                  : "bg-background hover:bg-accent text-muted-foreground"
+              }`}
+            >
+              <Github className="w-5 h-5" /> GitHub
+            </button>
+            <button
+              type="button"
+              onClick={() => setProvider("gitlab")}
+              disabled={isLoading}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-md transition-all ${
+                provider === "gitlab" 
+                  ? "bg-orange-500 text-white border-orange-500" 
+                  : "bg-background hover:bg-accent text-muted-foreground"
+              }`}
+            >
+              <Gitlab className="w-5 h-5" /> GitLab
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="repoPath">{initialProject ? "New Repository Path" : "Repository Path"}</Label>
           <Input 
-            id="githubRepo" 
+            id="repoPath" 
             placeholder="e.g. owner/repo-name" 
-            value={githubRepo}
-            onChange={(e) => setGithubRepo(e.target.value)}
+            value={repoPath}
+            onChange={(e) => setRepoPath(e.target.value)}
             disabled={isLoading}
             required
           />
+          <p className="text-xs text-muted-foreground">
+            {provider === "github" ? "The GitHub account and repository name." : "The GitLab account and repository name."}
+          </p>
         </div>
 
         {showWarning && (

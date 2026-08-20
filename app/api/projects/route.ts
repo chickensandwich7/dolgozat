@@ -22,15 +22,31 @@ export async function POST(req: Request) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    let cleanRepoPath = githubRepo;
-    if (githubRepo.includes("github.com/")) cleanRepoPath = githubRepo.split("github.com/")[1].trim();
+    
+    let provider = "github"; 
+    let rawPath = githubRepo;
+
+    if (githubRepo.includes("|")) {
+      const parts = githubRepo.split("|");
+      provider = parts[0];
+      rawPath = parts[1];
+    }
+
+    
+    let cleanRepoPath = rawPath;
+    if (cleanRepoPath.includes("github.com/")) cleanRepoPath = cleanRepoPath.split("github.com/")[1].trim();
+    if (cleanRepoPath.includes("gitlab.com/")) cleanRepoPath = cleanRepoPath.split("gitlab.com/")[1].trim();
     cleanRepoPath = cleanRepoPath.replace(/\/$/, "").replace(/\.git$/, "");
+
+    
+    const repoToSave = `${provider}|${cleanRepoPath}`;
+    // ---------------------------------------------
 
     const existingProjects = await db.select().from(project).where(eq(project.organizationId, organization.id));
 
     if (existingProjects.length > 0) {
       const updatedProject = await db.update(project)
-        .set({ name: name, githubRepo: cleanRepoPath })
+        .set({ name: name, githubRepo: repoToSave }) 
         .where(eq(project.id, existingProjects[0].id))
         .returning();
       return NextResponse.json(updatedProject[0]);
@@ -38,7 +54,7 @@ export async function POST(req: Request) {
       const newProject = await db.insert(project).values({
         id: crypto.randomUUID(),
         name: name,
-        githubRepo: cleanRepoPath,
+        githubRepo: repoToSave, 
         organizationId: organization.id,
       }).returning();
       return NextResponse.json(newProject[0]);

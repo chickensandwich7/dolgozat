@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, GripVertical, Github, Loader2, Filter, Edit2, Trash2, Calendar, GitCommit, Check } from "lucide-react";
+import { Plus, GripVertical, Github, Gitlab, Loader2, Filter, Edit2, Trash2, Calendar, GitCommit, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,15 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
   const [isLoadingCommits, setIsLoadingCommits] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
 
+  const isGitlab = typeof githubRepo === 'string' && githubRepo.startsWith("gitlab|");
+  const isGithub = typeof githubRepo === 'string' && githubRepo.startsWith("github|");
+  const repoProvider = isGitlab ? "gitlab" : "github"; 
+  
+  let cleanRepoPath = githubRepo;
+  if (isGitlab || isGithub) {
+    cleanRepoPath = githubRepo.split("|")[1];
+  }
+
   const columns = [
     { id: "todo", title: "To Do", color: "border-muted-foreground/20", bg: "bg-muted/10" },
     { id: "in_progress", title: "In Progress", color: "border-primary/30", bg: "bg-primary/5" },
@@ -48,7 +57,6 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     low: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   };
 
-  
   const getDueDateStatus = (dueDate: string | Date | null, status: string) => {
     if (!dueDate || status === "done") return "text-muted-foreground";
 
@@ -68,13 +76,30 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
   };
 
   const fetchRecentCommits = async () => {
-    if (!githubRepo) return; 
+    if (!cleanRepoPath) return; 
     setIsLoadingCommits(true);
     try {
-      const res = await fetch(`https://api.github.com/repos/${githubRepo}/commits?per_page=10`);
-      if (res.ok) {
-        const data = await res.json();
-        setCommits(data);
+      if (repoProvider === "gitlab") {
+        const encodedPath = encodeURIComponent(cleanRepoPath);
+        const res = await fetch(`https://gitlab.com/api/v4/projects/${encodedPath}/repository/commits?per_page=10`);
+        if (res.ok) {
+          const data = await res.json();
+          const normalized = data.map((c: any) => ({
+            sha: c.id,
+            html_url: c.web_url || `https://gitlab.com/${cleanRepoPath}/-/commit/${c.id}`,
+            commit: {
+              message: c.title || c.message,
+              author: { name: c.author_name }
+            }
+          }));
+          setCommits(normalized);
+        }
+      } else {
+        const res = await fetch(`https://api.github.com/repos/${cleanRepoPath}/commits?per_page=10`);
+        if (res.ok) {
+          const data = await res.json();
+          setCommits(data);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -179,9 +204,9 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     
     if (newStatus === "done" && !draggedTask.githubCommitLink) {
       setCommitPromptTask(draggedTask);
-      setShowManualInput(!githubRepo); 
+      setShowManualInput(!cleanRepoPath); 
       setCommitLink("");
-      if (githubRepo) {
+      if (cleanRepoPath) {
         fetchRecentCommits();
       }
       return; 
@@ -321,7 +346,12 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
                     <div className="flex items-center justify-between mt-auto pt-2">
                       {task.githubCommitLink ? (
                         <a href={task.githubCommitLink} target="_blank" className="text-[10px] font-medium flex items-center gap-1.5 text-foreground/70 bg-accent/50 px-2 py-1 rounded-md border border-border/50 transition-colors hover:text-foreground">
-                          <Github className="h-3 w-3" /> Commit
+                          {task.githubCommitLink.includes("gitlab.com") ? (
+                            <Gitlab className="h-3 w-3 text-orange-500" />
+                          ) : (
+                            <Github className="h-3 w-3" />
+                          )} 
+                          Commit
                         </a>
                       ) : <div />}
                       <Avatar className="h-6 w-6 border border-border">
@@ -380,12 +410,17 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
 
       <Dialog open={!!commitPromptTask} onOpenChange={(open) => !open && setCommitPromptTask(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Github className="h-5 w-5"/> Select a Commit</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {repoProvider === "gitlab" ? <Gitlab className="h-5 w-5 text-orange-500"/> : <Github className="h-5 w-5"/>} 
+              Select a Commit
+            </DialogTitle>
+          </DialogHeader>
           
           <div className="py-2">
             <p className="text-sm text-muted-foreground mb-4">Link your work to finish <strong>{commitPromptTask?.title}</strong>.</p>
             
-            {!showManualInput && githubRepo ? (
+            {!showManualInput && cleanRepoPath ? (
               <div className="space-y-3">
                 {isLoadingCommits ? (
                   <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -427,10 +462,10 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
             ) : (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                 <div className="space-y-2">
-                  <Label>GitHub Commit URL</Label>
-                  <Input placeholder="https://github.com/..." value={commitLink} onChange={(e) => setCommitLink(e.target.value)} />
+                  <Label>{repoProvider === "gitlab" ? "GitLab" : "GitHub"} Commit URL</Label>
+                  <Input placeholder={repoProvider === "gitlab" ? "https://gitlab.com/..." : "https://github.com/..."} value={commitLink} onChange={(e) => setCommitLink(e.target.value)} />
                 </div>
-                {githubRepo && (
+                {cleanRepoPath && (
                   <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setShowManualInput(false); setCommitLink(""); }}>
                     ← Back to recent commits
                   </Button>

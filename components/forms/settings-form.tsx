@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Loader2, Save, CheckCircle2, Github, Link as LinkIcon } from "lucide-react";
+import { User, Loader2, Save, CheckCircle2, Github, Gitlab, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,18 +11,28 @@ import { UploadButton } from "@/lib/uploadthing";
 import { authClient } from "@/lib/auth-client";
 
 
-export function SettingsForm({ user, initialHasGithubLinked }: { user: any, initialHasGithubLinked: boolean }) {
+export function SettingsForm({ 
+  user, 
+  initialHasGithubLinked, 
+  initialHasGitlabLinked 
+}: { 
+  user: any, 
+  initialHasGithubLinked: boolean,
+  initialHasGitlabLinked: boolean 
+}) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  
   const [isGithubLoading, setIsGithubLoading] = useState(false);
+  const [isGitlabLoading, setIsGitlabLoading] = useState(false);
   
   const [name, setName] = useState(user?.name || "");
   const [image, setImage] = useState(user?.image || "");
   const initials = user?.name?.substring(0, 2).toUpperCase() || "U";
   
-
   const [isGithubLinked, setIsGithubLinked] = useState(initialHasGithubLinked); 
+  const [isGitlabLinked, setIsGitlabLinked] = useState(initialHasGitlabLinked); 
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +72,19 @@ export function SettingsForm({ user, initialHasGithubLinked }: { user: any, init
     } catch (error) {
       console.error("Hiba a GitHub linkelésnél:", error);
       setIsGithubLoading(false);
+    }
+  };
+
+  const handleLinkGitlab = async () => {
+    setIsGitlabLoading(true);
+    try {
+      await authClient.signIn.social({
+        provider: "gitlab",
+        callbackURL: "/dashboard/settings", 
+      });
+    } catch (error) {
+      console.error("Hiba a GitLab linkelésnél:", error);
+      setIsGitlabLoading(false);
     }
   };
 
@@ -132,44 +155,84 @@ export function SettingsForm({ user, initialHasGithubLinked }: { user: any, init
           <LinkIcon className="h-5 w-5 text-primary" /> Connected Accounts
         </h2>
         
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl bg-muted/10 gap-4 transition-all hover:bg-muted/20">
-          <div className="flex items-center gap-4">
-            <div className="bg-background p-2.5 rounded-full border shadow-sm shrink-0">
-              <Github className="h-6 w-6" />
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl bg-muted/10 gap-4 transition-all hover:bg-muted/20">
+            <div className="flex items-center gap-4">
+              <div className="bg-background p-2.5 rounded-full border shadow-sm shrink-0">
+                <Github className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">GitHub</h3>
+                <p className="text-xs text-muted-foreground mt-0.5 max-w-[300px]">
+                  Link your GitHub account to directly sync commits and repositories with your tasks.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-sm">GitHub</h3>
-              <p className="text-xs text-muted-foreground mt-0.5 max-w-[300px]">
-                Link your GitHub account to directly sync commits and repositories with your tasks.
-              </p>
+            
+            <div className="shrink-0">
+              {isGithubLinked ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md text-sm font-semibold cursor-default">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Connected
+                </div>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={handleLinkGithub} 
+                  disabled={isGithubLoading || isGitlabLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {isGithubLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Github className="h-4 w-4 mr-2" />
+                  )}
+                  {isGithubLoading ? "Connecting..." : "Connect Account"}
+                </Button>
+              )}
             </div>
           </div>
-          
-          <div className="shrink-0">
-            {isGithubLinked ? (
-              <div className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md text-sm font-semibold cursor-default">
-                <CheckCircle2 className="h-4 w-4" />
-                Connected
+
+          {/* GitLab Card */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-xl bg-muted/10 gap-4 transition-all hover:bg-muted/20">
+            <div className="flex items-center gap-4">
+              <div className="bg-background p-2.5 rounded-full border shadow-sm shrink-0">
+                <Gitlab className="h-6 w-6 text-orange-500" />
               </div>
-            ) : (
-              <Button 
-                variant="outline" 
-                onClick={handleLinkGithub} 
-                disabled={isGithubLoading}
-                className="w-full sm:w-auto"
-              >
-                {isGithubLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Github className="h-4 w-4 mr-2" />
-                )}
-                {isGithubLoading ? "Connecting..." : "Connect Account"}
-              </Button>
-            )}
+              <div>
+                <h3 className="font-semibold text-sm">GitLab</h3>
+                <p className="text-xs text-muted-foreground mt-0.5 max-w-[300px]">
+                  Link your GitLab account to directly sync commits and repositories with your tasks.
+                </p>
+              </div>
+            </div>
+            
+            <div className="shrink-0">
+              {isGitlabLinked ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md text-sm font-semibold cursor-default">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Connected
+                </div>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={handleLinkGitlab} 
+                  disabled={isGitlabLoading || isGithubLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {isGitlabLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Gitlab className="h-4 w-4 mr-2 text-orange-500" />
+                  )}
+                  {isGitlabLoading ? "Connecting..." : "Connect Account"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
   );
 }

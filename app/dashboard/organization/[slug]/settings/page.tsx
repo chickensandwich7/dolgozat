@@ -2,7 +2,7 @@ import { getOrganizationBySlug } from "@/server/organizations";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { Github } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { RepoSettingsForm } from "@/components/repo-settings-form";
 import { DeleteOrganizationZone } from "@/components/ui/delete-organization-zone"; 
 import { db } from "@/db/drizzle";
@@ -39,11 +39,13 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
 
       <div className="bg-card border rounded-xl p-6 mb-8">
         <div className="flex items-center gap-3 mb-6">
-          <Github className="h-6 w-6" />
+          <div className="bg-primary/10 p-2 rounded-md">
+            <GitBranch className="h-6 w-6 text-primary" />
+          </div>
           <div>
-            <h2 className="text-lg font-semibold">Link GitHub Repository</h2>
+            <h2 className="text-lg font-semibold">Link Repository</h2>
             <p className="text-sm text-muted-foreground">
-              Connect a GitHub repository to track commits and project data.
+              Connect a GitHub or GitLab repository to track commits and project data.
             </p>
           </div>
         </div>
