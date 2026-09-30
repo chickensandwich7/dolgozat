@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Building2, Bell, Plus, LayoutDashboard, ChevronLeft, 
-  ChevronRight, CheckSquare, Users, Settings, ChevronDown, UserPlus, GitCommit 
+import {
+  Building2, Bell, Plus, LayoutDashboard, ChevronLeft,
+  ChevronRight, CheckSquare, Users, Settings, ChevronDown, UserPlus, GitCommit
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Logout } from "@/components/ui/logout";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CreateOrganizationForm } from "@/components/forms/create-organization-form";
 import { InviteUser } from "@/components/invite-user";
 import { cn } from "@/lib/utils";
+import { canManageMembers } from "@/lib/auth/roles";
 
 interface SidebarProps {
   organizations: any[];
@@ -32,8 +33,8 @@ export function SidebarUI({ organizations, pendingInvites, user, initials, unrea
   const currentSlug = match ? match[1] : null;
   const currentOrg = organizations.find((o) => o.slug === currentSlug);
 
-  const role = currentOrg?.userRole || "member";
-  const isAdminOrOwner = role === "owner" || role === "admin";
+  const role = currentOrg?.userRole || "developer";
+  const isAdminOrOwner = canManageMembers(role);
 
   return (
     <aside
@@ -110,7 +111,7 @@ export function SidebarUI({ organizations, pendingInvites, user, initials, unrea
                       <DialogHeader>
                         <DialogTitle>Invite to {currentOrg.name}</DialogTitle>
                       </DialogHeader>
-                      <InviteUser activeOrganizationId={currentOrg.id} />
+                      <InviteUser activeOrganizationId={currentOrg.id} inviterRole={role} />
                     </DialogContent>
                   </Dialog>
 
@@ -152,10 +153,16 @@ export function SidebarUI({ organizations, pendingInvites, user, initials, unrea
             href="/dashboard/alerts"
             className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", pathname === "/dashboard/alerts" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
           >
-            <Bell className="h-4 w-4 shrink-0" />
+            {isCollapsed && unreadCount > 0 ? (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            ) : (
+              <Bell className="h-4 w-4 shrink-0" />
+            )}
             {!isCollapsed && <span className="flex-1 text-left">Alerts</span>}
-            
-            {unreadCount > 0 && (
+
+            {!isCollapsed && unreadCount > 0 && (
               <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
@@ -273,7 +280,7 @@ export function SidebarUI({ organizations, pendingInvites, user, initials, unrea
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
               </Link>
-              <Logout />
+              <Logout iconOnly />
             </div>
           )}
         </div>

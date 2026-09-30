@@ -97,7 +97,7 @@ export const member = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: text("role").default("member").notNull(),
+    role: text("role").default("developer").notNull(),
     createdAt: timestamp("created_at").notNull(),
   },
   (table) => [
@@ -158,8 +158,10 @@ export const task = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .references(() => project.id, { onDelete: "set null" }),
     assigneeId: text("assignee_id")
-      .references(() => user.id, { onDelete: "set null" }), 
+      .references(() => user.id, { onDelete: "set null" }),
     createdById: text("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }), 
@@ -173,7 +175,41 @@ export const task = pgTable(
   (table) => [
     index("task_organizationId_idx").on(table.organizationId),
     index("task_assigneeId_idx").on(table.assigneeId),
+    index("task_projectId_idx").on(table.projectId),
   ],
+);
+
+export const taskComment = pgTable(
+  "task_comment",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("taskComment_taskId_idx").on(table.taskId)],
+);
+
+export const taskActivity = pgTable(
+  "task_activity",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    meta: text("meta"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("taskActivity_taskId_idx").on(table.taskId)],
 );
 
 
@@ -228,18 +264,23 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
 }));
 
-export const projectRelations = relations(project, ({ one }) => ({
+export const projectRelations = relations(project, ({ one, many }) => ({
   organization: one(organization, {
     fields: [project.organizationId],
     references: [organization.id],
   }),
+  tasks: many(task),
 }));
 
 
-export const taskRelations = relations(task, ({ one }) => ({
+export const taskRelations = relations(task, ({ one, many }) => ({
   organization: one(organization, {
     fields: [task.organizationId],
     references: [organization.id],
+  }),
+  project: one(project, {
+    fields: [task.projectId],
+    references: [project.id],
   }),
   assignee: one(user, {
     fields: [task.assigneeId],
@@ -247,6 +288,30 @@ export const taskRelations = relations(task, ({ one }) => ({
   }),
   creator: one(user, {
     fields: [task.createdById],
+    references: [user.id],
+  }),
+  comments: many(taskComment),
+  activity: many(taskActivity),
+}));
+
+export const taskCommentRelations = relations(taskComment, ({ one }) => ({
+  task: one(task, {
+    fields: [taskComment.taskId],
+    references: [task.id],
+  }),
+  author: one(user, {
+    fields: [taskComment.authorId],
+    references: [user.id],
+  }),
+}));
+
+export const taskActivityRelations = relations(taskActivity, ({ one }) => ({
+  task: one(task, {
+    fields: [taskActivity.taskId],
+    references: [task.id],
+  }),
+  actor: one(user, {
+    fields: [taskActivity.actorId],
     references: [user.id],
   }),
 }));
@@ -268,8 +333,10 @@ export type Member = typeof member.$inferSelect & { user: typeof user.$inferSele
 export type User = typeof user.$inferSelect;
 export type Project = typeof project.$inferSelect;
 export type Task = typeof task.$inferSelect; // Ez is új
+export type TaskComment = typeof taskComment.$inferSelect;
+export type TaskActivity = typeof taskActivity.$inferSelect;
 
 export const schema = {
-  user, session, account, verification, organization, member, invitation, project, task, 
-  organizationRelations, memberRelations, userRelations, sessionRelations, accountRelations, invitationRelations, projectRelations, taskRelations 
+  user, session, account, verification, organization, member, invitation, project, task, taskComment, taskActivity,
+  organizationRelations, memberRelations, userRelations, sessionRelations, accountRelations, invitationRelations, projectRelations, taskRelations, taskCommentRelations, taskActivityRelations
 };

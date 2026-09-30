@@ -3,6 +3,7 @@ import { getOrganizationBySlug } from "@/server/organizations";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { canManageMembers } from "@/lib/auth/roles";
 
 type Params = Promise<{ slug: string }>;
 
@@ -18,7 +19,7 @@ export default async function OrganizationMembersPage({ params }: { params: Para
   );
 
   const role = currentUserMember?.role;
-  if (role !== "owner" && role !== "admin") {
+  if (!canManageMembers(role)) {
     redirect(`/dashboard/organization/${slug}`);
   }
 
@@ -30,9 +31,9 @@ export default async function OrganizationMembersPage({ params }: { params: Para
           Manage your team members and their roles here.
         </p>
       </div>
-      
+
       <div className="mt-6">
-        <MembersTable members={organization.members || []} />
+        <MembersTable members={organization.members || []} slug={slug} />
       </div>
     </div>
   );

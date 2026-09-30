@@ -3,13 +3,18 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { searchUsersToInvite } from "@/server/users"; 
-import { authClient } from "@/lib/auth-client"; 
+import { searchUsersToInvite } from "@/server/users";
+import { authClient } from "@/lib/auth-client";
 
-export function InviteUser({ activeOrganizationId }: { activeOrganizationId: string }) {
+export function InviteUser({ activeOrganizationId, inviterRole }: { activeOrganizationId: string; inviterRole?: string }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [role, setRole] = useState("developer");
+
+  const assignableRoles = inviterRole === "owner"
+    ? ["developer", "teamlead", "admin"]
+    : ["developer", "teamlead"];
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -30,7 +35,7 @@ export function InviteUser({ activeOrganizationId }: { activeOrganizationId: str
     try {
       const { data, error } = await authClient.organization.inviteMember({
         email: email,
-        role: "member",
+        role: role as "developer" | "teamlead" | "admin",
         organizationId: activeOrganizationId,
       });
 
@@ -67,6 +72,19 @@ export function InviteUser({ activeOrganizationId }: { activeOrganizationId: str
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-1 block">Role</label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+        >
+          {assignableRoles.map((r) => (
+            <option key={r} value={r} className="capitalize">{r}</option>
+          ))}
+        </select>
       </div>
 
       {isSearching && <p className="text-sm text-muted-foreground">Searching...</p>}

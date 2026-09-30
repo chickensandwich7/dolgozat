@@ -4,6 +4,7 @@ import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ROLES, canManageMembers } from "@/lib/auth/roles";
 
 type Member = {
   id: string;
@@ -16,13 +17,41 @@ type Member = {
   };
 };
 
-export default function MembersTable({ members }: { members: any[] }) {
+export default function MembersTable({ members, slug }: { members: any[]; slug: string }) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
 
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
   const isOwner = currentUserMember?.role === "owner";
+  const canEditRoles = canManageMembers(currentUserMember?.role);
+
+  const assignableRolesFor = (targetRole: string) => {
+    if (isOwner) return ROLES;
+    return targetRole === "owner" || targetRole === "admin" ? [targetRole] : ["developer", "teamlead"];
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: string) => {
+    setRoleChangingId(memberId);
+    try {
+      const res = await fetch("/api/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, newRole, slug }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        alert(`Failed to update role: ${text}`);
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("System Error:", err);
+      alert("An unexpected error occurred.");
+    } finally {
+      setRoleChangingId(null);
+    }
+  };
 
   const handleRemove = async (memberId: string, orgId: string) => {
     if (!confirm("Are you sure you want to remove this member?")) return;
@@ -90,12 +119,29 @@ export default function MembersTable({ members }: { members: any[] }) {
           <tbody>
             {members.map((member: Member) => {
               const isMe = member.userId === session?.user?.id;
+              const canEditThisRow = !isMe && canEditRoles &&
+                (isOwner || (member.role !== "owner" && member.role !== "admin"));
 
               return (
                 <tr key={member.id} className="border-b last:border-0">
                   <td className="py-3 font-medium">{member.user?.name || "Unknown User"}</td>
                   <td className="py-3 text-muted-foreground">{member.user?.email}</td>
-                  <td className="py-3 capitalize">{member.role}</td>
+                  <td className="py-3">
+                    {canEditThisRow ? (
+                      <select
+                        className="capitalize text-sm border rounded-md px-2 py-1 bg-background disabled:opacity-50"
+                        value={member.role}
+                        disabled={roleChangingId === member.id}
+                        onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                      >
+                        {assignableRolesFor(member.role).map((r) => (
+                          <option key={r} value={r} className="capitalize">{r}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="capitalize">{member.role}</span>
+                    )}
+                  </td>
                   <td className="py-3 text-right">
                     
                     {isMe ? (

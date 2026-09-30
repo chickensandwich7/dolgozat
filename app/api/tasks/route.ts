@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { getOrganizationBySlug } from "@/server/organizations";
 import { eq } from "drizzle-orm";
+import { canManageTasks } from "@/lib/auth/roles";
+import { logActivity } from "@/server/activity";
 
 export async function GET(req: Request) {
   try {
@@ -17,6 +19,9 @@ export async function GET(req: Request) {
 
     const organization = await getOrganizationBySlug(slug);
     if (!organization) return new NextResponse("Organization not found", { status: 404 });
+
+    const currentMember = organization.members.find((m: any) => m.userId === session.user.id);
+    if (!currentMember) return new NextResponse("Forbidden", { status: 403 });
 
     const tasks = await db.select().from(task).where(eq(task.organizationId, organization.id));
     return NextResponse.json(tasks);
@@ -31,13 +36,13 @@ export async function POST(req: Request) {
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 });
 
     const body = await req.json();
-    const { title, description, assigneeId, priority, dueDate, slug } = body;
+    const { title, description, assigneeId, priority, dueDate, projectId, slug } = body;
 
     const organization = await getOrganizationBySlug(slug);
     if (!organization) return new NextResponse("Organization not found", { status: 404 });
 
     const currentMember = organization.members.find((m: any) => m.userId === session.user.id);
-    if (!currentMember || (currentMember.role !== "owner" && currentMember.role !== "admin")) {
+    if (!currentMember || !canManageTasks(currentMember.role)) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
@@ -48,9 +53,12 @@ export async function POST(req: Request) {
       priority: priority || "medium",
       dueDate: dueDate ? new Date(dueDate) : null,
       assigneeId: assigneeId || null,
+      projectId: projectId || null,
       organizationId: organization.id,
       createdById: session.user.id,
     }).returning();
+
+    await logActivity(newTask[0].id, session.user.id, "created");
 
     if (assigneeId && assigneeId !== session.user.id) {
       await db.insert(notification).values({
@@ -76,7 +84,7 @@ export async function PATCH(req: Request) {
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 });
 
     const body = await req.json();
-    const { taskId, status, githubCommitLink, title, description, assigneeId, priority, dueDate, slug } = body;
+    const { taskId, status, githubCommitLink, title, description, assigneeId, priority, dueDate, projectId, slug } = body;
 
     const organization = await getOrganizationBySlug(slug);
     if (!organization) return new NextResponse("Organization not found", { status: 404 });
@@ -88,9 +96,9 @@ export async function PATCH(req: Request) {
     const currentTask = existingTasks[0];
     if (!currentTask) return new NextResponse("Task not found", { status: 404 });
 
-    const isAdminOrOwner = currentMember.role === "owner" || currentMember.role === "admin";
-    
-    if ((title !== undefined || description !== undefined || priority !== undefined || dueDate !== undefined) && !isAdminOrOwner) {
+    const isAdminOrOwner = canManageTasks(currentMember.role);
+
+    if ((title !== undefined || description !== undefined || priority !== undefined || dueDate !== undefined || assigneeId !== undefined || projectId !== undefined) && !isAdminOrOwner) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
@@ -107,13 +115,40 @@ export async function PATCH(req: Request) {
         priority: priority !== undefined ? priority : currentTask.priority,
         dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : currentTask.dueDate,
         assigneeId: assigneeId !== undefined ? (assigneeId === "unassigned" ? null : assigneeId) : currentTask.assigneeId,
+        projectId: projectId !== undefined ? (projectId === "none" ? null : projectId) : currentTask.projectId,
       })
       .where(eq(task.id, taskId))
       .returning();
 
+    if (status !== undefined && status !== currentTask.status) {
+      await logActivity(taskId, session.user.id, "status_changed", { from: currentTask.status, to: status });
+    }
+    if (assigneeId !== undefined) {
+      const newAssigneeId = assigneeId === "unassigned" ? null : assigneeId;
+      if (newAssigneeId !== currentTask.assigneeId) {
+        await logActivity(taskId, session.user.id, "reassigned", { from: currentTask.assigneeId, to: newAssigneeId });
+      }
+    }
+    if (githubCommitLink !== undefined && githubCommitLink !== currentTask.githubCommitLink) {
+      await logActivity(taskId, session.user.id, "commit_linked", { link: githubCommitLink });
+    }
+    if (projectId !== undefined) {
+      const newProjectId = projectId === "none" ? null : projectId;
+      if (newProjectId !== currentTask.projectId) {
+        await logActivity(taskId, session.user.id, "moved_project", { from: currentTask.projectId, to: newProjectId });
+      }
+    }
+    if (
+      (title !== undefined && title !== currentTask.title) ||
+      (description !== undefined && description !== currentTask.description) ||
+      (priority !== undefined && priority !== currentTask.priority)
+    ) {
+      await logActivity(taskId, session.user.id, "edited");
+    }
+
     if (status === "done" && currentTask.status !== "done") {
-      const admins = organization.members.filter((m: any) => m.role === "admin" || m.role === "owner");
-      
+      const admins = organization.members.filter((m: any) => canManageTasks(m.role));
+
       for (const admin of admins) {
         if (admin.userId !== session.user.id) {
           await db.insert(notification).values({
@@ -150,7 +185,7 @@ export async function DELETE(req: Request) {
     if (!organization) return new NextResponse("Organization not found", { status: 404 });
 
     const currentMember = organization.members.find((m: any) => m.userId === session.user.id);
-    if (!currentMember || (currentMember.role !== "owner" && currentMember.role !== "admin")) {
+    if (!currentMember || !canManageTasks(currentMember.role)) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 

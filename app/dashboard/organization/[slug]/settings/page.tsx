@@ -3,11 +3,13 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { GitBranch } from "lucide-react";
-import { RepoSettingsForm } from "@/components/repo-settings-form";
-import { DeleteOrganizationZone } from "@/components/ui/delete-organization-zone"; 
+import { AddProjectButton } from "@/components/add-project-button";
+import { ProjectCard } from "@/components/project-card";
+import { DeleteOrganizationZone } from "@/components/ui/delete-organization-zone";
 import { db } from "@/db/drizzle";
 import { project } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { canManageOrg } from "@/lib/auth/roles";
 
 export default async function OrganizationSettingsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -21,12 +23,11 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
   );
 
   const role = currentUserMember?.role;
-  if (role !== "owner" && role !== "admin") {
+  if (!canManageOrg(role)) {
     redirect(`/dashboard/organization/${slug}`);
   }
 
   const linkedProjects = await db.select().from(project).where(eq(project.organizationId, organization.id));
-  const currentProject = linkedProjects[0] || null;
 
   return (
     <div className="max-w-3xl mx-auto py-10">
@@ -38,19 +39,32 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
       </div>
 
       <div className="bg-card border rounded-xl p-6 mb-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-primary/10 p-2 rounded-md">
-            <GitBranch className="h-6 w-6 text-primary" />
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-md">
+              <GitBranch className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Projects</h2>
+              <p className="text-sm text-muted-foreground">
+                Connect GitHub or GitLab repositories to track commits and tasks per project.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">Link Repository</h2>
-            <p className="text-sm text-muted-foreground">
-              Connect a GitHub or GitLab repository to track commits and project data.
-            </p>
-          </div>
+          <AddProjectButton slug={slug} />
         </div>
 
-        <RepoSettingsForm slug={slug} initialProject={currentProject} />
+        {linkedProjects.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-lg">
+            No projects yet. Add one to start tracking tasks and commits.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {linkedProjects.map((p) => (
+              <ProjectCard key={p.id} project={p} slug={slug} />
+            ))}
+          </div>
+        )}
       </div>
 
       {role === "owner" && (

@@ -6,9 +6,17 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban-board";
+import { canManageTasks } from "@/lib/auth/roles";
 
-export default async function TasksPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function TasksPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ project?: string }>;
+}) {
   const { slug } = await params;
+  const { project: projectParam } = await searchParams;
   const organization = await getOrganizationBySlug(slug);
 
   if (!organization) redirect("/dashboard");
@@ -22,12 +30,13 @@ export default async function TasksPage({ params }: { params: Promise<{ slug: st
 
   if (!currentUserMember) redirect(`/dashboard`);
 
-  const isAdminOrOwner = currentUserMember.role === "owner" || currentUserMember.role === "admin";
+  const isAdminOrOwner = canManageTasks(currentUserMember.role);
 
-  const initialTasks = await db.select().from(task).where(eq(task.organizationId, organization.id));
+  const projects = await db.select().from(project).where(eq(project.organizationId, organization.id));
+  const selectedProject = projectParam ? projects.find((p) => p.id === projectParam) ?? null : null;
 
-  const projectData = await db.select().from(project).where(eq(project.organizationId, organization.id));
-  const githubRepo = projectData.length > 0 ? projectData[0].githubRepo : null;
+  const allTasks = await db.select().from(task).where(eq(task.organizationId, organization.id));
+  const initialTasks = selectedProject ? allTasks.filter((t) => t.projectId === selectedProject.id) : allTasks;
 
   return (
     <div className="flex flex-col h-[calc(100vh-theme(spacing.16))]">
@@ -40,12 +49,14 @@ export default async function TasksPage({ params }: { params: Promise<{ slug: st
 
       <div className="flex-1 overflow-x-auto bg-muted/30">
          <KanbanBoard
+           key={selectedProject?.id ?? "all"}
            initialTasks={initialTasks}
            members={organization.members}
            currentUser={session.user}
            isAdmin={isAdminOrOwner}
            slug={slug}
-           githubRepo={githubRepo} 
+           projects={projects}
+           selectedProjectId={selectedProject?.id ?? null}
          />
       </div>
     </div>

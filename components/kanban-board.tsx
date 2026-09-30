@@ -8,19 +8,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TaskDetailDialog } from "@/components/task-detail-dialog";
 
-export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug, githubRepo }: any) {
+function getProjectRepo(projects: any[], projectId: string | null | undefined) {
+  const proj = projects?.find((p: any) => p.id === projectId);
+  if (!proj?.githubRepo) return null;
+  const isGitlab = proj.githubRepo.startsWith("gitlab|");
+  const isGithub = proj.githubRepo.startsWith("github|");
+  const provider = isGitlab ? "gitlab" : "github";
+  const path = isGitlab || isGithub ? proj.githubRepo.split("|")[1] : proj.githubRepo;
+  return { provider, path };
+}
+
+export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug, projects, selectedProjectId }: any) {
   const router = useRouter();
+
+  const handleProjectChange = (projectId: string) => {
+    router.push(projectId ? `/dashboard/organization/${slug}/tasks?project=${projectId}` : `/dashboard/organization/${slug}/tasks`);
+  };
   const [tasks, setTasks] = useState(initialTasks);
   const [isLoading, setIsLoading] = useState(false);
   const [showOnlyMyTasks, setShowOnlyMyTasks] = useState(false);
-  
+
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskProjectId, setNewTaskProjectId] = useState(selectedProjectId || "");
 
   const [editingTask, setEditingTask] = useState<any>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -28,22 +44,20 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
   const [editAssignee, setEditAssignee] = useState("");
   const [editPriority, setEditPriority] = useState("medium");
   const [editDueDate, setEditDueDate] = useState("");
+  const [editProjectId, setEditProjectId] = useState("");
+
+  const [detailTask, setDetailTask] = useState<any>(null);
 
   const [commitPromptTask, setCommitPromptTask] = useState<any>(null);
   const [commitLink, setCommitLink] = useState("");
-  
+
   const [commits, setCommits] = useState<any[]>([]);
   const [isLoadingCommits, setIsLoadingCommits] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
 
-  const isGitlab = typeof githubRepo === 'string' && githubRepo.startsWith("gitlab|");
-  const isGithub = typeof githubRepo === 'string' && githubRepo.startsWith("github|");
-  const repoProvider = isGitlab ? "gitlab" : "github"; 
-  
-  let cleanRepoPath = githubRepo;
-  if (isGitlab || isGithub) {
-    cleanRepoPath = githubRepo.split("|")[1];
-  }
+  const activeRepo = commitPromptTask ? getProjectRepo(projects, commitPromptTask.projectId) : null;
+  const repoProvider = activeRepo?.provider || "github";
+  const cleanRepoPath = activeRepo?.path || null;
 
   const columns = [
     { id: "todo", title: "To Do", color: "border-muted-foreground/20", bg: "bg-muted/10" },
@@ -75,18 +89,17 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     return "text-muted-foreground"; 
   };
 
-  const fetchRecentCommits = async () => {
-    if (!cleanRepoPath) return; 
+  const fetchRecentCommits = async (repo: { provider: string; path: string }) => {
     setIsLoadingCommits(true);
     try {
-      if (repoProvider === "gitlab") {
-        const encodedPath = encodeURIComponent(cleanRepoPath);
+      if (repo.provider === "gitlab") {
+        const encodedPath = encodeURIComponent(repo.path);
         const res = await fetch(`https://gitlab.com/api/v4/projects/${encodedPath}/repository/commits?per_page=10`);
         if (res.ok) {
           const data = await res.json();
           const normalized = data.map((c: any) => ({
             sha: c.id,
-            html_url: c.web_url || `https://gitlab.com/${cleanRepoPath}/-/commit/${c.id}`,
+            html_url: c.web_url || `https://gitlab.com/${repo.path}/-/commit/${c.id}`,
             commit: {
               message: c.title || c.message,
               author: { name: c.author_name }
@@ -95,7 +108,7 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
           setCommits(normalized);
         }
       } else {
-        const res = await fetch(`https://api.github.com/repos/${cleanRepoPath}/commits?per_page=10`);
+        const res = await fetch(`https://api.github.com/repos/${repo.path}/commits?per_page=10`);
         if (res.ok) {
           const data = await res.json();
           setCommits(data);
@@ -121,6 +134,7 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
           assigneeId: newTaskAssignee || null,
           priority: newTaskPriority,
           dueDate: newTaskDueDate || null,
+          projectId: newTaskProjectId || null,
           slug,
         }),
       });
@@ -129,7 +143,7 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
         const createdTask = await res.json();
         setTasks([...tasks, createdTask]);
         setIsNewTaskOpen(false);
-        setNewTaskTitle(""); setNewTaskDesc(""); setNewTaskAssignee(""); setNewTaskPriority("medium"); setNewTaskDueDate("");
+        setNewTaskTitle(""); setNewTaskDesc(""); setNewTaskAssignee(""); setNewTaskPriority("medium"); setNewTaskDueDate(""); setNewTaskProjectId(selectedProjectId || "");
       }
     } finally {
       setIsLoading(false);
@@ -153,6 +167,7 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     setEditAssignee(task.assigneeId || "");
     setEditPriority(task.priority || "medium");
     setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "");
+    setEditProjectId(task.projectId || "");
   };
 
   const submitEditTask = async (e: React.FormEvent) => {
@@ -160,29 +175,31 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     if (!editingTask) return;
     setIsLoading(true);
 
-    const updatedTask = { 
-      ...editingTask, 
-      title: editTitle, 
-      description: editDesc, 
+    const updatedTask = {
+      ...editingTask,
+      title: editTitle,
+      description: editDesc,
       assigneeId: editAssignee || null,
       priority: editPriority,
-      dueDate: editDueDate || null
+      dueDate: editDueDate || null,
+      projectId: editProjectId || null,
     };
-    
+
     setTasks(tasks.map((t: any) => t.id === editingTask.id ? updatedTask : t));
 
     try {
       await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          taskId: editingTask.id, 
-          title: editTitle, 
-          description: editDesc, 
+        body: JSON.stringify({
+          taskId: editingTask.id,
+          title: editTitle,
+          description: editDesc,
           assigneeId: editAssignee === "" ? "unassigned" : editAssignee,
           priority: editPriority,
           dueDate: editDueDate || null,
-          slug 
+          projectId: editProjectId === "" ? "none" : editProjectId,
+          slug
         }),
       });
       setEditingTask(null);
@@ -203,13 +220,14 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
     if (!draggedTask || draggedTask.status === newStatus) return;
     
     if (newStatus === "done" && !draggedTask.githubCommitLink) {
+      const repo = getProjectRepo(projects, draggedTask.projectId);
       setCommitPromptTask(draggedTask);
-      setShowManualInput(!cleanRepoPath); 
+      setShowManualInput(!repo);
       setCommitLink("");
-      if (cleanRepoPath) {
-        fetchRecentCommits();
+      if (repo) {
+        fetchRecentCommits(repo);
       }
-      return; 
+      return;
     }
     
     updateTaskStatus(taskId, newStatus);
@@ -246,11 +264,26 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
   return (
     <div className="p-6 h-full flex flex-col min-w-[800px]">
       
-      <div className="flex justify-between items-center mb-6">
-        <Button variant={showOnlyMyTasks ? "default" : "outline"} size="sm" onClick={() => setShowOnlyMyTasks(!showOnlyMyTasks)} className="text-xs h-8">
-          <Filter className="h-3 w-3 mr-2" />
-          {showOnlyMyTasks ? "Showing My Tasks" : "All Tasks"}
-        </Button>
+      <div className="flex justify-between items-center mb-6 gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant={showOnlyMyTasks ? "default" : "outline"} size="sm" onClick={() => setShowOnlyMyTasks(!showOnlyMyTasks)} className="text-xs h-8">
+            <Filter className="h-3 w-3 mr-2" />
+            {showOnlyMyTasks ? "Showing My Tasks" : "All Tasks"}
+          </Button>
+
+          {projects && projects.length > 0 && (
+            <select
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              value={selectedProjectId || ""}
+              onChange={(e) => handleProjectChange(e.target.value)}
+            >
+              <option value="">All Projects</option>
+              {projects.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {isAdmin && (
           <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
@@ -289,6 +322,15 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
                     {members.map((m: any) => (<option key={m.userId} value={m.userId}>{m.user.name}</option>))}
                   </select>
                 </div>
+                {projects && projects.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Project</Label>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={newTaskProjectId} onChange={(e) => setNewTaskProjectId(e.target.value)}>
+                      <option value="">-- No Project --</option>
+                      {projects.map((p: any) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                    </select>
+                  </div>
+                )}
                 <Button type="submit" disabled={isLoading} className="w-full">Create Task</Button>
               </form>
             </DialogContent>
@@ -310,22 +352,30 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
               {visibleTasks.filter((t: any) => t.status === col.id).map((task: any) => {
                 const assignedMember = members.find((m: any) => m.userId === task.assigneeId);
                 const isDraggable = isAdmin || task.assigneeId === currentUser.id;
+                const taskProject = projects?.find((p: any) => p.id === task.projectId);
 
                 const dateStyleClass = getDueDateStatus(task.dueDate, task.status);
 
                 return (
-                  <div key={task.id} draggable={isDraggable} onDragStart={(e) => handleDragStart(e, task.id)} className={`bg-card p-4 rounded-xl border border-border/50 shadow-sm transition-all duration-200 group flex flex-col ${isDraggable ? 'cursor-grab active:cursor-grabbing hover:border-primary/50' : 'opacity-75'}`}>
+                  <div key={task.id} draggable={isDraggable} onDragStart={(e) => handleDragStart(e, task.id)} onClick={() => setDetailTask(task)} className={`bg-card p-4 rounded-xl border border-border/50 shadow-sm transition-all duration-200 group flex flex-col cursor-pointer ${isDraggable ? 'active:cursor-grabbing hover:border-primary/50' : 'opacity-75'}`}>
                     <div className="flex justify-between items-start mb-2 gap-2">
                       <div className="flex flex-col gap-1.5 flex-1">
-                        <div className={`text-[10px] w-fit px-2 py-0.5 rounded-full border font-bold uppercase tracking-tighter ${priorityColors[task.priority]}`}>
-                          {task.priority}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className={`text-[10px] w-fit px-2 py-0.5 rounded-full border font-bold uppercase tracking-tighter ${priorityColors[task.priority]}`}>
+                            {task.priority}
+                          </div>
+                          {!selectedProjectId && projects?.length > 0 && (
+                            <div className="text-[10px] w-fit px-2 py-0.5 rounded-full border border-border/50 bg-muted/50 text-muted-foreground font-medium">
+                              {taskProject ? taskProject.name : "No Project"}
+                            </div>
+                          )}
                         </div>
                         <h3 className="font-medium text-sm leading-tight">{task.title}</h3>
                       </div>
                       {isAdmin && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openEditDialog(task)} className="p-1.5 hover:bg-primary/20 text-primary rounded-md"><Edit2 className="h-3.5 w-3.5" /></button>
-                          <button onClick={() => handleDeleteTask(task.id)} className="p-1.5 hover:bg-destructive/20 text-destructive rounded-md"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); openEditDialog(task); }} className="p-1.5 hover:bg-primary/20 text-primary rounded-md"><Edit2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 hover:bg-destructive/20 text-destructive rounded-md"><Trash2 className="h-3.5 w-3.5" /></button>
                         </div>
                       )}
                     </div>
@@ -345,7 +395,7 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
 
                     <div className="flex items-center justify-between mt-auto pt-2">
                       {task.githubCommitLink ? (
-                        <a href={task.githubCommitLink} target="_blank" className="text-[10px] font-medium flex items-center gap-1.5 text-foreground/70 bg-accent/50 px-2 py-1 rounded-md border border-border/50 transition-colors hover:text-foreground">
+                        <a href={task.githubCommitLink} target="_blank" onClick={(e) => e.stopPropagation()} className="text-[10px] font-medium flex items-center gap-1.5 text-foreground/70 bg-accent/50 px-2 py-1 rounded-md border border-border/50 transition-colors hover:text-foreground">
                           {task.githubCommitLink.includes("gitlab.com") ? (
                             <Gitlab className="h-3 w-3 text-orange-500" />
                           ) : (
@@ -403,6 +453,15 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
                 {members.map((m: any) => (<option key={m.userId} value={m.userId}>{m.user.name}</option>))}
               </select>
             </div>
+            {projects && projects.length > 0 && (
+              <div className="space-y-2">
+                <Label>Project</Label>
+                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)}>
+                  <option value="">-- No Project --</option>
+                  {projects.map((p: any) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                </select>
+              </div>
+            )}
             <Button type="submit" disabled={isLoading} className="w-full">Save Changes</Button>
           </form>
         </DialogContent>
@@ -481,7 +540,9 @@ export function KanbanBoard({ initialTasks, members, currentUser, isAdmin, slug,
           </div>
         </DialogContent>
       </Dialog>
-      
+
+      <TaskDetailDialog task={detailTask} open={!!detailTask} onOpenChange={(open) => !open && setDetailTask(null)} />
+
     </div>
   );
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers"; 
 import { Button } from "@/components/ui/button";
+import { canManageOrg } from "@/lib/auth/roles";
 
 export default async function CommitsPage({ 
   params,
@@ -29,11 +30,12 @@ export default async function CommitsPage({
   const currentMember = organization.members.find(
     (m: any) => m.userId === session?.user?.id
   );
-  const isAdminOrOwner = currentMember?.role === "owner" || currentMember?.role === "admin";
+  const isAdminOrOwner = canManageOrg(currentMember?.role);
 
   const linkedProjects = await db.select().from(project).where(eq(project.organizationId, organization.id));
-  const activeProject = linkedProjects[0];
-  
+  const projectParam = typeof resolvedSearchParams.project === "string" ? resolvedSearchParams.project : undefined;
+  const activeProject = (projectParam && linkedProjects.find((p) => p.id === projectParam)) || linkedProjects[0];
+
   if (!activeProject) {
     return (
       <div className="max-w-4xl mx-auto py-10">
@@ -115,10 +117,11 @@ export default async function CommitsPage({
   }
 
   const hasNextPage = rawCommits.length === perPage;
+  const projectQuery = `&project=${activeProject.id}`;
 
   return (
     <div className="max-w-4xl mx-auto py-10 flex flex-col min-h-[calc(100vh-100px)]">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Project Commits</h1>
           <div className="flex items-center gap-2 mt-1">
@@ -132,6 +135,22 @@ export default async function CommitsPage({
             </p>
           </div>
         </div>
+
+        {linkedProjects.length > 1 && (
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            {linkedProjects.map((p) => (
+              <Link
+                key={p.id}
+                href={`/dashboard/organization/${slug}/commits?project=${p.id}`}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  p.id === activeProject.id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.name}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="space-y-4 flex-1">
@@ -176,7 +195,7 @@ export default async function CommitsPage({
           asChild={currentPage > 1}
         >
           {currentPage > 1 ? (
-            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage - 1}`}>
+            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage - 1}${projectQuery}`}>
               <ChevronLeft className="h-4 w-4 mr-2" /> Previous
             </Link>
           ) : (
@@ -196,7 +215,7 @@ export default async function CommitsPage({
           asChild={hasNextPage}
         >
           {hasNextPage ? (
-            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage + 1}`}>
+            <Link href={`/dashboard/organization/${slug}/commits?page=${currentPage + 1}${projectQuery}`}>
               Next <ChevronRight className="h-4 w-4 ml-2" />
             </Link>
           ) : (

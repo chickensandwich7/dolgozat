@@ -80,6 +80,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --viz-blue: #2a78d6;
+  --viz-orange: #eb6834;
+  --viz-aqua: #1baf7a;
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-critical: #d03b3b;
+  --viz-grid: #e1e0d9;
 }
 
 .dark {
@@ -114,6 +122,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --viz-blue: #3987e5;
+  --viz-orange: #d95926;
+  --viz-aqua: #199e70;
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-critical: #e66767;
+  --viz-grid: #2c2c2a;
 }
 
 @layer base {
